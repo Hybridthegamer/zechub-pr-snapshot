@@ -1,0 +1,48 @@
+name: snapshot
+
+# Every 15 minutes, dump ZecHub/zechub pull request metadata to the `snapshot`
+# branch of this repo as snapshot.json. Public data only; no handle list lives here.
+on:
+  schedule:
+    - cron: "*/15 * * * *"
+  workflow_dispatch: {}
+
+permissions:
+  contents: write
+
+concurrency:
+  group: snapshot
+  cancel-in-progress: false
+
+jobs:
+  snapshot:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Load previous snapshot
+        run: |
+          if git fetch --depth=1 origin snapshot 2>/dev/null; then
+            git worktree add --detach prev FETCH_HEAD
+          else
+            mkdir -p prev
+          fi
+
+      - name: Build snapshot
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          SOURCE_REPO: ZecHub/zechub
+        run: python3 snapshot.py prev/snapshot.json out/snapshot.json
+
+      - name: Publish to snapshot branch
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          cd out
+          git init -q -b snapshot
+          git config user.name "snapshot-bot"
+          git config user.email "snapshot-bot@users.noreply.github.com"
+          git add snapshot.json
+          git commit -qm "snapshot $(date -u +%Y-%m-%dT%H:%MZ)"
+          git push -qf "https://x-access-token:${GITHUB_TOKEN}@github.com/${GITHUB_REPOSITORY}.git" snapshot
