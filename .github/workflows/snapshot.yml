@@ -46,3 +46,10 @@ jobs:
           git add snapshot.json
           git commit -qm "snapshot $(date -u +%Y-%m-%dT%H:%MZ)"
           git push -qf "https://x-access-token:${GITHUB_TOKEN}@github.com/${GITHUB_REPOSITORY}.git" snapshot
+
+      - name: Trigger PR Watch
+        continue-on-error: true
+        run: |
+          curl -fsS -m 60 -o /dev/null \
+            -H "Authorization: Bearer ${{ secrets.PR_WATCH_CRON_SECRET }}" \
+            "${{ secrets.PR_WATCH_URL }}/api/check"
